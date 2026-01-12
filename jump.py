@@ -12,7 +12,7 @@ pose = mp_pose.Pose(model_complexity=2)
 # ----------------------
 HEIGHT_THRESH = 0.06     # how much higher than standing
 VEL_THRESH = -0.002
-LANDING_THRESH = 0.015
+LANDING_THRESH = 0.014
 
 hip_buffer = deque(maxlen=30)
 vel_buffer = deque(maxlen=10)
