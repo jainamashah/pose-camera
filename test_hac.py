@@ -28,14 +28,14 @@
 # cap.release()
 # cv2.destroyAllWindows()
 
-# import sys
-# import os
+import sys
+import os
 
-# # Get the absolute path of the directory containing the module
-# module_dir = os.path.abspath('human-action-classification/src')
+# Get the absolute path of the directory containing the module
+module_dir = os.path.abspath('human-action-classification/src')
 
-# # Insert it at the beginning of the system path
-# sys.path.insert(0, module_dir)
+# Insert it at the beginning of the system path
+sys.path.insert(0, module_dir)
 
 from hac import ActionPredictor
 
