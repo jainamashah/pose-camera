@@ -10,9 +10,9 @@ pose = mp_pose.Pose(model_complexity=2)
 # ----------------------
 # Parameters
 # ----------------------
-HEIGHT_THRESH = 0.06     # how much higher than standing
+HEIGHT_THRESH = 0.04     # how much higher than standing
 VEL_THRESH = -0.002
-LANDING_THRESH = 0.014
+LANDING_THRESH = 0.013
 
 hip_buffer = deque(maxlen=30)
 vel_buffer = deque(maxlen=10)
@@ -24,7 +24,33 @@ peak_taken = False
 SAVE_DIR = "jump_photos"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+def estimate_sharpness(image):
+    """Estimate image sharpness using Laplacian variance"""
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+    return laplacian_var
+
+def enhance_image(image):
+    """Enhance image quality to reduce blur artifacts"""
+    # Reduce noise while preserving edges
+    denoised = cv2.bilateralFilter(image, 9, 75, 75)
+    # Enhance edges slightly
+    kernel = np.array([[-1,-1,-1],
+                       [-1, 9,-1],
+                       [-1,-1,-1]]) / 1.0
+    sharpened = cv2.filter2D(denoised, -1, kernel)
+    # Blend for natural look
+    enhanced = cv2.addWeighted(denoised, 0.6, sharpened, 0.4, 0)
+    return enhanced
+
 cap = cv2.VideoCapture(0)
+# Set camera properties for better image quality
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_FPS, 30)
+cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+# Use automatic exposure for better brightness
+cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)  # Auto exposure mode
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -59,8 +85,27 @@ while cap.isOpened():
                 if in_jump and not peak_taken:
                     if vel_buffer[-2] < 0 and vel >= 0:
                         jump_count += 1
-                        cv2.imwrite(f"{SAVE_DIR}/jump_{jump_count}.jpg", frame)
-                        print(f"📸 Jump {jump_count} peak captured")
+                        # Capture multiple frames around peak and select sharpest
+                        peak_frames = [frame]
+                        
+                        # Temporarily capture next few frames for best quality
+                        for _ in range(3):
+                            ret_temp, temp_frame = cap.read()
+                            if ret_temp:
+                                peak_frames.append(temp_frame)
+                        
+                        # Select sharpest frame
+                        sharpness_scores = [estimate_sharpness(f) for f in peak_frames]
+                        best_idx = np.argmax(sharpness_scores)
+                        best_frame = peak_frames[best_idx]
+                        
+                        # Enhance the best frame
+                        enhanced_frame = enhance_image(best_frame)
+                        
+                        # Save with quality settings
+                        cv2.imwrite(f"{SAVE_DIR}/jump_{jump_count}.jpg", enhanced_frame, 
+                                   [cv2.IMWRITE_JPEG_QUALITY, 95])
+                        print(f"📸 Jump {jump_count} peak captured (sharpness: {sharpness_scores[best_idx]:.2f})")
                         peak_taken = True
 
                 # -------- LANDING --------
